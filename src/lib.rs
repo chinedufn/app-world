@@ -88,7 +88,15 @@ mod world_with_message_buffer;
 ///
 /// In a browser application this might update the DOM. On iOS this might increment a @Published
 /// variable in SwiftUI.
+#[cfg(not(feature = "send"))]
 pub type RenderFn = Arc<Mutex<Box<dyn FnMut() -> ()>>>;
+
+/// A function that can trigger a re-render of the application.
+///
+/// In a browser application this might update the DOM. On iOS this might increment a @Published
+/// variable in SwiftUI.
+#[cfg(feature = "send")]
+pub type RenderFn = Arc<Mutex<Box<dyn FnMut() -> () + Send + Sync>>>;
 
 /// Holds application state and resources and will trigger a re-render after .msg() calls.
 /// See the [crate level documentation](crate) for more details.
