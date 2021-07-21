@@ -1,12 +1,5 @@
 //! app-world provides a framework agnostic approach to managing frontend application state.
 //!
-//! It is geared towards frontend applications that only need to re-render when application state
-//! changes. This is true of the vast majority of browser, desktop and mobile apps today.
-//!
-//! Many of today's frontend frameworks allow you to have a main state singleton, local
-//! per-view-component state, state that can magically appear anywhere anytime, state that can mow
-//! your lawn, as well as other brands of state that I've since lost count of.
-//!
 //! # The Data Model
 //!
 //! An `AppWorld` is a type that you define that holds your application state as well as other
@@ -14,7 +7,7 @@
 //!
 //! Here's an example of what an AppWorld for a basic e-commerce app frontend might look like:
 //!
-//! ```
+//! ```rust
 //! # use std::collections::HashMap;
 //! struct MyAppWorld {
 //!     state: MyAppState,
@@ -43,7 +36,7 @@
 //!
 //! Instead, you wrap it in an `app_world::AppWorldWrapper<W>`
 //!
-//! ```
+//! ```rust
 //! type MyAppWorldWrapper = app_world::AppWorldWrapper<MyAppWorld>;
 //!
 //! # type MyAppWorld = ();
@@ -59,6 +52,14 @@
 //!
 //! Whenever you update state using a `.msg()` call, the [`RenderFn`] that you provide is called
 //! and your application gets re-rendered.
+//!
+//! You can pass your `AppWorldWrapper<W>` to different threads by calling
+//! [`AppWorldWrapper.clone()`]. Under the hood an [`Arc`] is used to share your data across
+//! threads.
+//!
+//! # Example Usage
+//!
+//! TODO
 //!
 //! # When to Use app-world
 //!
