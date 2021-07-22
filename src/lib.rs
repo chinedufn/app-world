@@ -131,6 +131,10 @@ pub trait AppWorld: Sized {
     /// Send a message to the state object.
     /// This will usually lead to a state update
     fn msg(&mut self, message: Self::Message, world_wrapper: AppWorldWrapper<Self>);
+
+    /// Whether or not the application should be told to re-render.
+    /// This check occurs before the messae is processed.
+    fn should_rerender(&self, message: &Self::Message) -> bool;
 }
 
 impl<W: AppWorld> AppWorldWrapper<W> {
@@ -144,12 +148,16 @@ impl<W: AppWorld> AppWorldWrapper<W> {
 
     /// Acquire write access to the AppWorld then send a message.
     pub fn msg(&self, msg: W::Message) {
+        let should_rerender = self.world.read().unwrap().should_rerender(&msg);
+
         self.world
             .write()
             .unwrap()
             .message_maybe_capture(msg, self.clone());
 
-        (self.render_fn.lock().unwrap())();
+        if should_rerender {
+            (self.render_fn.lock().unwrap())();
+        }
     }
 
     /// Acquire read access to AppWorld.
