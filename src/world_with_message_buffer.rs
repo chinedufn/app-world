@@ -64,3 +64,10 @@ impl<W: AppWorld> Deref for WorldWithMessageBuffer<W> {
         &self.world
     }
 }
+
+#[cfg(feature = "test-utils")]
+impl<W: AppWorld> std::ops::DerefMut for WorldWithMessageBuffer<W> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.world
+    }
+}

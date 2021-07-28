@@ -1,6 +1,6 @@
 [package]
 name = "app-world"
-version = "0.1.3"
+version = "0.1.4"
 description = "A framework agnostic approach to managing frontend application state."
 edition = "2018"
 keywords = ["state", "frontend"]
