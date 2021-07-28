@@ -6,7 +6,9 @@ use std::ops::Deref;
 /// This is useful for testing that an event handler dispatched the `Msg`'s that we expected it to.
 pub struct WorldWithMessageBuffer<W: AppWorld> {
     world: W,
+    #[cfg(feature = "test-utils")]
     message_buffer: Vec<W::Message>,
+    #[cfg(feature = "test-utils")]
     capture_messages: bool,
 }
 
@@ -15,12 +17,15 @@ impl<W: AppWorld> WorldWithMessageBuffer<W> {
     pub fn new(state: W) -> Self {
         WorldWithMessageBuffer {
             world: state,
+            #[cfg(feature = "test-utils")]
             message_buffer: Vec::new(),
+            #[cfg(feature = "test-utils")]
             capture_messages: false,
         }
     }
 }
 
+#[cfg(feature = "test-utils")]
 impl<W: AppWorld> AppWorldWrapper<W> {
     /// Set whether or not messages get pushed to the message buffer.
     pub fn set_capture_messages(&mut self, capture: bool) {
@@ -28,6 +33,7 @@ impl<W: AppWorld> AppWorldWrapper<W> {
     }
 }
 
+#[cfg(feature = "test-utils")]
 impl<W: AppWorld> WorldWithMessageBuffer<W> {
     /// After calling `StateWithMessageBuffer.capture_messages(true)`, all .msg() calls will push to this
     /// buffer.
@@ -42,11 +48,12 @@ impl<W: AppWorld> WorldWithMessageBuffer<W> {
         message: W::Message,
         world_wrapper: AppWorldWrapper<W>,
     ) {
+        #[cfg(feature = "test-utils")]
         if self.capture_messages {
-            self.message_buffer.push(message);
-        } else {
-            self.world.msg(message, world_wrapper);
+            return self.message_buffer.push(message);
         }
+
+        self.world.msg(message, world_wrapper);
     }
 }
 

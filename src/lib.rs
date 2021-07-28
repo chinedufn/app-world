@@ -164,6 +164,18 @@ impl<W: AppWorld> AppWorldWrapper<W> {
     pub fn read(&self) -> RwLockReadGuard<'_, WorldWithMessageBuffer<W>> {
         self.world.read().unwrap()
     }
+
+    /// Acquire write access to AppWorld.
+    ///
+    /// Under normal circumstances you should only ever write to the world through the `.msg()`
+    /// method.
+    ///
+    /// This .write() method is useful when writing tests where you want to quickly set up some
+    /// initial state.
+    #[cfg(feature = "test-utils")]
+    pub fn write(&self) -> std::sync::RwLockWriteGuard<'_, WorldWithMessageBuffer<W>> {
+        self.world.write().unwrap()
+    }
 }
 
 impl<S: AppWorld> Clone for AppWorldWrapper<S> {
