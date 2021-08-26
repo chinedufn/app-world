@@ -28,7 +28,7 @@ impl<W: AppWorld> WorldWithMessageBuffer<W> {
 #[cfg(feature = "test-utils")]
 impl<W: AppWorld> AppWorldWrapper<W> {
     /// Set whether or not messages get pushed to the message buffer.
-    pub fn set_capture_messages(&mut self, capture: bool) {
+    pub fn set_capture_messages(&self, capture: bool) {
         self.world.write().unwrap().capture_messages = capture;
     }
 }
