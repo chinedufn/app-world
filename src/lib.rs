@@ -84,20 +84,6 @@ pub use self::world_with_message_buffer::*;
 
 mod world_with_message_buffer;
 
-/// A function that can trigger a re-render of the application.
-///
-/// In a browser application this might update the DOM. On iOS this might increment a @Published
-/// variable in SwiftUI.
-#[cfg(not(feature = "send"))]
-pub type RenderFn = Arc<Mutex<Box<dyn FnMut() -> ()>>>;
-
-/// A function that can trigger a re-render of the application.
-///
-/// In a browser application this might update the DOM. On iOS this might increment a @Published
-/// variable in SwiftUI.
-#[cfg(feature = "send")]
-pub type RenderFn = Arc<Mutex<Box<dyn FnMut() -> () + Send + Sync>>>;
-
 /// Holds application state and resources and will trigger a re-render after .msg() calls.
 /// See the [crate level documentation](crate) for more details.
 ///
@@ -111,7 +97,6 @@ pub type RenderFn = Arc<Mutex<Box<dyn FnMut() -> () + Send + Sync>>>;
 /// All clones hold pointers to the same inner state.
 pub struct AppWorldWrapper<W: AppWorld> {
     world: Arc<RwLock<WorldWithMessageBuffer<W>>>,
-    render_fn: RenderFn,
 }
 
 /// Defines how messages that indicate that something has happened get sent to the World.
@@ -131,33 +116,22 @@ pub trait AppWorld: Sized {
     /// Send a message to the state object.
     /// This will usually lead to a state update
     fn msg(&mut self, message: Self::Message, world_wrapper: AppWorldWrapper<Self>);
-
-    /// Whether or not the application should be told to re-render.
-    /// This check occurs before the messae is processed.
-    fn should_rerender(&self, message: &Self::Message) -> bool;
 }
 
 impl<W: AppWorld> AppWorldWrapper<W> {
     /// Create a new AppWorldWrapper.
-    pub fn new(world: W, render_fn: RenderFn) -> Self {
+    pub fn new(world: W) -> Self {
         Self {
             world: Arc::new(RwLock::new(WorldWithMessageBuffer::new(world))),
-            render_fn,
         }
     }
 
     /// Acquire write access to the AppWorld then send a message.
     pub fn msg(&self, msg: W::Message) {
-        let should_rerender = self.world.read().unwrap().should_rerender(&msg);
-
         self.world
             .write()
             .unwrap()
             .message_maybe_capture(msg, self.clone());
-
-        if should_rerender {
-            (self.render_fn.lock().unwrap())();
-        }
     }
 
     /// Acquire read access to AppWorld.
@@ -182,7 +156,6 @@ impl<S: AppWorld> Clone for AppWorldWrapper<S> {
     fn clone(&self) -> Self {
         AppWorldWrapper {
             world: Arc::clone(&self.world),
-            render_fn: Arc::clone(&self.render_fn),
         }
     }
 }
