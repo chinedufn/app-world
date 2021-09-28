@@ -78,9 +78,8 @@
 
 #![deny(missing_docs)]
 
-use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
-
-pub use self::world_with_message_buffer::*;
+use crate::world_with_message_buffer::WorldWithMessageBuffer;
+use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 mod world_with_message_buffer;
 
@@ -95,8 +94,8 @@ mod world_with_message_buffer;
 /// closures.
 ///
 /// All clones hold pointers to the same inner state.
-pub struct AppWorldWrapper<W: AppWorld> {
-    world: Arc<RwLock<WorldWithMessageBuffer<W>>>,
+pub struct AppWorldWrapper<W: AppWorld + 'static> {
+    world: &'static Arc<RwLock<WorldWithMessageBuffer<W>>>,
 }
 
 /// Defines how messages that indicate that something has happened get sent to the World.
@@ -118,12 +117,13 @@ pub trait AppWorld: Sized {
     fn msg(&mut self, message: Self::Message, world_wrapper: AppWorldWrapper<Self>);
 }
 
-impl<W: AppWorld> AppWorldWrapper<W> {
+impl<W: AppWorld + 'static> AppWorldWrapper<W> {
     /// Create a new AppWorldWrapper.
     pub fn new(world: W) -> Self {
-        Self {
-            world: Arc::new(RwLock::new(WorldWithMessageBuffer::new(world))),
-        }
+        let world = Arc::new(RwLock::new(WorldWithMessageBuffer::new(world)));
+        let world = Box::leak(Box::new(world));
+
+        Self { world }
     }
 
     /// Acquire write access to the AppWorld then send a message.
@@ -131,7 +131,7 @@ impl<W: AppWorld> AppWorldWrapper<W> {
         self.world
             .write()
             .unwrap()
-            .message_maybe_capture(msg, self.clone());
+            .message_maybe_capture(msg, *self);
     }
 
     /// Acquire read access to AppWorld.
@@ -152,10 +152,10 @@ impl<W: AppWorld> AppWorldWrapper<W> {
     }
 }
 
-impl<S: AppWorld> Clone for AppWorldWrapper<S> {
+impl<W: AppWorld + 'static> Clone for AppWorldWrapper<W> {
     fn clone(&self) -> Self {
-        AppWorldWrapper {
-            world: Arc::clone(&self.world),
-        }
+        AppWorldWrapper { world: self.world }
     }
 }
+
+impl<W: AppWorld + 'static> Copy for AppWorldWrapper<W> {}
