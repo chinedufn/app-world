@@ -78,7 +78,7 @@
 
 #![deny(missing_docs)]
 
-use crate::world_with_message_buffer::WorldWithMessageBuffer;
+pub use crate::world_with_message_buffer::WorldWithMessageBuffer;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 mod world_with_message_buffer;
