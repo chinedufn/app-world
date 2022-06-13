@@ -4,8 +4,6 @@
 
 `app-world` is a simple thread-safe storage for application state and resources.
 
-`app-world` has zero dependencies.
-
 ## Background
 
 Highly interactive frontend applications need a way to interface with large amounts of application state.
@@ -22,9 +20,13 @@ With `app-world` you have a single `World` which holds your application `State`,
 You then send `Message`s to your world in order to update application state. This is the only way to mutate application state
 (with the exception of fields that have interior mutability).
 
----
+#### Games
 
-`app-world` should not be used for games. Instead try checking out one of Rust's many entity component system crates.
+`app-world` is designed so that at most one thread can access state at any given time.
+
+This makes `app-world` unsuitable for highly stateful real-time games where you'll often want to be able to update state from many threads simultaneously.
+
+If you're working on a game try checking out one of Rust's many entity component system crates.
 
 ## Example Usage
 
