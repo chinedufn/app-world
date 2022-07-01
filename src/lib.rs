@@ -50,9 +50,6 @@
 //! Instead, the [`AppWorld`] trait defines a [`AppWorld.msg()`] method that can be used to update
 //! your application state.
 //!
-//! Whenever you update state using a `.msg()` call, the [`RenderFn`] that you provide is called
-//! and your application gets re-rendered.
-//!
 //! You can pass your `AppWorldWrapper<W>` to different threads by calling
 //! [`AppWorldWrapper.clone()`]. Under the hood an [`Arc`] is used to share your data across
 //! threads.
@@ -78,24 +75,18 @@
 
 #![deny(missing_docs)]
 
-pub use crate::world_with_message_buffer::WorldWithMessageBuffer;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
-mod world_with_message_buffer;
-
-/// Holds application state and resources and will trigger a re-render after .msg() calls.
+/// Holds application state and resources.
 /// See the [crate level documentation](crate) for more details.
 ///
 /// # Cloning
 ///
 /// Cloning an `AppWorldWrapper` is a very cheap operation.
 ///
-/// It can be useful to clone `AppWorldWrapper`'s in order to pass the world into event handler
-/// closures.
-///
 /// All clones hold pointers to the same inner state.
-pub struct AppWorldWrapper<W: AppWorld + 'static> {
-    world: &'static Arc<RwLock<WorldWithMessageBuffer<W>>>,
+pub struct AppWorldWrapper<W: AppWorld> {
+    world: Arc<RwLock<W>>,
 }
 
 /// Defines how messages that indicate that something has happened get sent to the World.
@@ -114,28 +105,23 @@ pub trait AppWorld: Sized {
 
     /// Send a message to the state object.
     /// This will usually lead to a state update
-    fn msg(&mut self, message: Self::Message, world_wrapper: AppWorldWrapper<Self>);
+    fn msg(&mut self, message: Self::Message);
 }
 
 impl<W: AppWorld + 'static> AppWorldWrapper<W> {
     /// Create a new AppWorldWrapper.
     pub fn new(world: W) -> Self {
-        let world = Arc::new(RwLock::new(WorldWithMessageBuffer::new(world)));
-        let world = Box::leak(Box::new(world));
-
+        let world = Arc::new(RwLock::new(world));
         Self { world }
     }
 
     /// Acquire write access to the AppWorld then send a message.
     pub fn msg(&self, msg: W::Message) {
-        self.world
-            .write()
-            .unwrap()
-            .message_maybe_capture(msg, *self);
+        self.world.write().unwrap().msg(msg)
     }
 
     /// Acquire read access to AppWorld.
-    pub fn read(&self) -> RwLockReadGuard<'_, WorldWithMessageBuffer<W>> {
+    pub fn read(&self) -> RwLockReadGuard<'_, W> {
         self.world.read().unwrap()
     }
 
@@ -147,15 +133,15 @@ impl<W: AppWorld + 'static> AppWorldWrapper<W> {
     /// This .write() method is useful when writing tests where you want to quickly set up some
     /// initial state.
     #[cfg(feature = "test-utils")]
-    pub fn write(&self) -> std::sync::RwLockWriteGuard<'_, WorldWithMessageBuffer<W>> {
+    pub fn write(&self) -> std::sync::RwLockWriteGuard<'_, W> {
         self.world.write().unwrap()
     }
 }
 
-impl<W: AppWorld + 'static> Clone for AppWorldWrapper<W> {
+impl<W: AppWorld> Clone for AppWorldWrapper<W> {
     fn clone(&self) -> Self {
-        AppWorldWrapper { world: self.world }
+        AppWorldWrapper {
+            world: self.world.clone(),
+        }
     }
 }
-
-impl<W: AppWorld + 'static> Copy for AppWorldWrapper<W> {}
