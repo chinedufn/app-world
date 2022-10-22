@@ -5,7 +5,7 @@ description = "A framework agnostic approach to managing frontend application st
 edition = "2018"
 keywords = ["state", "frontend"]
 license = "MIT/Apache-2.0"
-repository = "https://github.com/chinedufn/percy"
+repository = "https://github.com/chinedufn/app-world"
 documentation = "https://docs.rs/app_world"
 
 [features]
