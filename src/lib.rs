@@ -24,7 +24,7 @@
 //!     api_client: ApiClient
 //! }
 //!
-//! # trait MyFileStoreTrait {};
+//! # trait MyFileStoreTrait {}
 //! # type ApiClient = ();
 //! # type Product = ();
 //! # type User = ();
@@ -75,7 +75,10 @@
 
 #![deny(missing_docs)]
 
+use std::cell::RefCell;
+use std::ops::Deref;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::thread::LocalKey;
 
 /// Holds application state and resources.
 /// See the [crate level documentation](crate) for more details.
@@ -119,10 +122,37 @@ impl<W: AppWorld + 'static> AppWorldWrapper<W> {
     pub fn msg(&self, msg: W::Message) {
         self.world.write().unwrap().msg(msg)
     }
+}
+
+impl<W: AppWorld + 'static> AppWorldWrapper<W> {
+    thread_local!(
+        static HAS_READ: RefCell<bool> = RefCell::new(false);
+    );
 
     /// Acquire read access to AppWorld.
-    pub fn read(&self) -> RwLockReadGuard<'_, W> {
-        self.world.read().unwrap()
+    ///
+    /// # Panics
+    /// Panics if the current thread is already holding a read guard.
+    ///
+    /// This panic prevents the following scenario from deadlocking:
+    ///
+    /// 1. Thread A acquires a read guard
+    /// 2. Thread B calls `AppWorld::msg`, which attempts to acquire a write lock
+    /// 3. Thread A attempts to acquire a second read guard while the first is still active
+    pub fn read(&self) -> WorldReadGuard<'_, W> {
+        Self::HAS_READ.with(|has_read| {
+            let mut has_read = has_read.borrow_mut();
+
+            if *has_read {
+                panic!("Thread already holds read guard")
+            }
+
+            *has_read = true
+        });
+        WorldReadGuard {
+            guard: self.world.read().unwrap(),
+            read_tracker: &Self::HAS_READ,
+        }
     }
 
     /// Acquire write access to AppWorld.
@@ -142,6 +172,109 @@ impl<W: AppWorld> Clone for AppWorldWrapper<W> {
     fn clone(&self) -> Self {
         AppWorldWrapper {
             world: self.world.clone(),
+        }
+    }
+}
+
+/// Holds a read guard on a World.
+pub struct WorldReadGuard<'a, W> {
+    guard: RwLockReadGuard<'a, W>,
+    read_tracker: &'static LocalKey<RefCell<bool>>,
+}
+impl<'a, W> Deref for WorldReadGuard<'a, W> {
+    type Target = RwLockReadGuard<'a, W>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.guard
+    }
+}
+impl<'a, W> Drop for WorldReadGuard<'a, W> {
+    fn drop(&mut self) {
+        self.read_tracker.with(|has_reads| {
+            *has_reads.borrow_mut() = false;
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::thread;
+    use std::time::Duration;
+
+    /// Verify that we prevent deadlocks when a thread tries to acquire a read guard on the world
+    /// twice.
+    ///
+    /// ---
+    ///
+    /// Given Thread A and B, a deadlock can occur if:
+    ///
+    /// 1. Thread A acquires read guard
+    /// 2. Thread B begins waiting for a write guard
+    /// 3. Thread A begins waiting for a second read guard
+    ///
+    /// On some platforms the guard acquisition order would be Thread A, Thread A, Thread B.
+    /// That is to say that attempts to acquire write guards do not block attempts to acquire read
+    /// guards.
+    ///
+    /// On other platforms, attempts to write may take precedence over attempts to read.
+    ///
+    /// On those platforms, Thread A will deadlock on the second read, and Thread B will deadlock
+    /// on the write.
+    ///
+    /// On macOS Ventura the sequence described above will cause a deadlock.
+    ///
+    /// This test uses two threads and `std::time::sleep` to simulate the sequence above and
+    /// confirm that we panic if a thread tries to hold two active read guards at once.
+    #[test]
+    #[should_panic = "Second read attempt panicked"]
+    fn deadlock_prevention_same_thread_double_read_another_thread_write() {
+        let world = AppWorldWrapper::new(TestWorld { was_mutated: false });
+        let world_clone1 = world.clone();
+        let world_clone2 = world.clone();
+
+        let handle = thread::spawn(move || {
+            let guard_1 = world.read();
+            assert_eq!(guard_1.was_mutated, false);
+
+            let handle = thread::spawn(move || {
+                world_clone1.msg(());
+            });
+
+            thread::sleep(Duration::from_millis(50));
+            let guard_3 = world.read();
+            assert_eq!(guard_3.was_mutated, true);
+
+            handle.join().unwrap();
+        });
+
+        let join = handle.join();
+
+        assert_eq!(world_clone2.read().was_mutated, true);
+        join.expect("Second read attempt panicked");
+    }
+
+    /// Verify that the same thread can acquire a second read guard after the first has been
+    /// dropped.
+    #[test]
+    fn two_non_colliding_reads() {
+        let world = AppWorldWrapper::new(TestWorld::default());
+
+        {
+            let _guard = world.read();
+        }
+
+        let _guard = world.read();
+    }
+
+    #[derive(Default)]
+    struct TestWorld {
+        was_mutated: bool,
+    }
+    impl AppWorld for TestWorld {
+        type Message = ();
+        fn msg(&mut self, _message: Self::Message) {
+            self.was_mutated = true;
         }
     }
 }

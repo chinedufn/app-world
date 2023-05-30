@@ -1,15 +1,14 @@
 [package]
 name = "app-world"
-version = "0.2.0"
+version = "0.3.0"
 description = "A framework agnostic approach to managing frontend application state."
-edition = "2018"
+edition = "2021"
 keywords = ["state", "frontend"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/chinedufn/app-world"
 documentation = "https://docs.rs/app_world"
 
 [features]
-send = []
 test-utils = []
 
 [dependencies]

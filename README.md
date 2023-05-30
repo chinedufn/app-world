@@ -2,31 +2,43 @@
 
 > A framework agnostic approach to managing frontend application state.
 
-`app-world` is a simple thread-safe storage for application state and resources.
+## Overview
 
-## Background
+`app-world` is simple thread-safe state management library that is designed to be useful in cross-platform frontend applications
+that manage large amounts of application state.
 
-Highly interactive frontend applications need a way to interface with large amounts of application state.
-
-Many frontend frameworks come with state management infrastructure that is coupled to the framework.
-
-`app-world` is designed to be used in any frontend application. This makes it well suited those who want to be able to run
-their state related logic across multiple target platforms such as the web, mobile and desktop.
 
 With `app-world` you have a single `World` which holds your application `State`, as well your application's `Resource`s.
 
-`Resource`s are typically used to interface with the outside world, such as to write to a file storage or to make an API request.
+`Resource`s are used to interface with the outside world, such as to write to a local file storage or to make an API request.
 
-You then send `Message`s to your world in order to update application state. This is the only way to mutate application state
-(with the exception of fields that have interior mutability).
+The only way to mutate application state is by sending a `Msg` (ignoring `UnsafeCell` based interior mutability).
 
-#### Games
+This means that all state mutation can be handled in a single place, which makes it easy to reason about the application's
+behavior and decreases the likelihood of code duplication.
 
-`app-world` is designed so that at most one thread can access state at any given time.
+## Cross-Platform Applications
 
-This makes `app-world` unsuitable for highly stateful real-time games where you'll often want to be able to update state from many threads simultaneously.
+`app-world` does not have any platform dependent code, making it suitable for writing cross-platform application logic that can run on the
+web, mobile and desktop.
 
-If you're working on a game try checking out one of Rust's many entity component system crates.
+For example, `app-world` can be used to manage state in a Rust core application that gets run on `iOS`, `Android` and in web browsers.
+
+## Thread Safety
+
+You cannot acquire a write guard on the World directly. The only way to write to a World is via `AppWorld::msg`.
+
+Multiple threads can read from an `AppWorld` simultaneously, but only one `AppWorld::msg` will be processed at a time.
+
+This means that you can safely use `app-world` in multi-threaded applications without worrying about deadlocks.
+
+## Games
+
+Multiple threads can read from an `AppWorld` simultaneously, but only one `AppWorld::msg` will be processed at a time.
+
+This makes `app-world` a poor fit for games that have hardcore performance requirements where you might want many threads to be able to manipulate the World simultaneously.
+
+In those cases, consider using one of the many existing Entity Component System crates.
 
 ## Example Usage
 
@@ -53,13 +65,25 @@ enum Msg {
 type MyAppStateWrapper = AppWorldWrapper<MyAppState>;
 
 impl AppWorld for MyAppWorld {
-    // ...
+    type Msg = Msg;
+
+    fn msg(&mut self, message: Msg) {
+        match msg {
+            Msg::IncrementCount(increment) => {
+                self.count += 1;
+            }
+        }
+    }
 }
 
 fn main () {
     let world = AppWorldWrapper::new(MyAppWorld::new());
+    let world_clone = world.clone();
 
+    assert_eq!(world.read().count, 0);
     world.msg(Msg::IncrementCount);
+    world_clone.msg(Msg::IncrementCount);
+    assert_eq!(world.read().count, 2);
 }
 ```
 
